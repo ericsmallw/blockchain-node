@@ -1,5 +1,4 @@
 import * as axios from 'axios';
-import * as Q from 'q'
 
 import Block from './block';
 import Transaction from './transaction';
@@ -7,8 +6,8 @@ import * as Hashes from 'jshashes';
 
 
 class Blockchain {
-    
-    constructor() { 
+
+    constructor() {
         this.SHA256 = new Hashes.SHA256;
         this.chain = [];
         this.current_transactions = [];
@@ -16,11 +15,22 @@ class Blockchain {
 
         //create genesis block
         this.new_block(100, 1);
+
+        // make sure all functions in class maintain correct context
+        this.new_block = this.new_block.bind(this);
+        this.valid_chain = this.valid_chain.bind(this);
+        this.new_block = this.new_block.bind(this);
+        this.last_block = this.last_block.bind(this);
+        this.proof_of_work = this.proof_of_work.bind(this);
+        this.valid_proof = this.valid_proof.bind(this);
+        this.hash = this.hash.bind(this);
+        this.register_node = this.register_node.bind(this);
+        this.resolve_conflicts = this.resolve_conflicts.bind(this);
     }
 
     new_block(proof, previous_hash = null) {
         // Creates a new Block and add it to the chain
-        const ph = previous_hash ? previous_hash : this.SHA256.hex(this.chain[this.chain.length - 1]) ;
+        const ph = previous_hash ? previous_hash : this.SHA256.hex(this.chain[this.chain.length - 1]);
         let block = new Block(this.chain.length + 1, this.current_transactions, proof, ph);
         this.current_transactions = [];
         this.chain.push(block);
@@ -43,7 +53,7 @@ class Blockchain {
      */
     proof_of_work(address) {
         let proof = 0;
-        while(this.valid_proof(this.last_block().proof, proof)) {
+        while (!this.valid_proof(this.last_block().proof, proof)) {
             proof++;
         }
 
@@ -51,7 +61,7 @@ class Blockchain {
         this.new_block(proof);
 
         return {
-            message: 'New Block Forged', 
+            message: 'New Block Forged',
             index: this.last_block().index,
             transactions: this.last_block().transactions,
             proof: this.last_block().proof,
@@ -67,11 +77,10 @@ class Blockchain {
      * @returns number
      */
     valid_proof(last_proof, proof) {
-        return this.SHA256.hex(`${last_proof}${proof}`).substring(0, 4) !== '0000'
+        return this.SHA256.hex(`${last_proof}${proof}`).substring(0, 4) === '0000'
     }
 
-    static hash(block) {
-        
+    hash(block) {
         return this.SHA256.hex(block);
     }
 
@@ -91,15 +100,15 @@ class Blockchain {
      * @returns boolean - true if valid, false if not
      */
     valid_chain(chain) {
-        let last_block = this.chain[0];
+        let last_block = chain[0];
 
-        for(let i = 0; i < this.chain.length; i++) {
-            let block = this.chain[i];
-            if(block.previous_hash !== this.hash(last_block))  {
+        for (let i = 1; i < chain.length; i++) {
+            let block = chain[i];
+            if (block.previous_hash !== this.hash(last_block)) {
                 return false;
             }
 
-            if(!this.valid_proof(last_block.proof, block.proof)) {
+            if (!this.valid_proof(last_block.proof, block.proof)) {
                 return false;
             }
 
@@ -116,39 +125,36 @@ class Blockchain {
      * @returns true if our chain was replaced, false if not
      */
     resolve_conflicts() {
-        console.log('test')
-        let new_chain = null;
-        let max_length = this.chain.length;
-        const deferred = Q.defer(); //using promises since these are asynchronous requests
+        return new Promise((resolve, reject) => {
+            // Grab and verify the chains from all nodes in our network
+            const requests = Array.from(this.nodes).map(node => axios.get(`${node}/chain`));
+            Promise.all(requests).then(
+                responses => {
+                    let new_chain;
+
+                    responses
+                        .filter(response => response.status === 200)
+                        .forEach(response => {
+                            let chain = response.data.chain
+                            // // Check if the length is longer and the chain is valid
+                            if (chain.length > this.chain.length && this.valid_chain(chain)) {
+                                new_chain = chain;
+                            }
+                        });
     
-
-        // Grab and verify the chains from all nodes in our network
-        const requests = Array.from(this.nodes).map(node => axios.get(`${node}/chain`));
-        console.log(`${Array.from(this.nodes)[0]}/chain`);
-        Q.all(requests).then(responses => {
-            let new_chain;
-            responses
-                .filter(response => response.status === 200)
-                .forEach(response => {
-                    console.log('test2')
-                    let chain = response.data.chain
-                    // Check if the length is longer and the chain is valid
-                    if (chain.length > max_length && this.valid_chain(chain)) {
-                        max_length = chain.length;
-                        new_chain = chain;
+                    
+                    if (new_chain) {
+                        this.chain = new_chain;
+                        resolve(true);
+                    } else {
+                        resolve(false);
                     }
-                });
-            
-                console.log('test3')
-            if (new_chain) {
-                this.chain = new_chain;
-                deferred.resolve(true);
-            } else {
-                deferred.resolve(false);
-            }
+                },
+                error => {
+                    reject(false);
+                }
+            );
         });
-
-        return deferred.promise;
     }
 };
 

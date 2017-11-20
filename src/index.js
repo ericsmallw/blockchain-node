@@ -79,7 +79,8 @@ app.get('/nodes/resolve', (req, res) => {
                     chain: blockchain.chain
                 })
             }
-        }
+        },
+        (error => ({error: `An error has occured: ${error}`}))
     );
 });
 
