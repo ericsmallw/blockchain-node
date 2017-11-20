@@ -121,6 +121,8 @@ class Blockchain {
     /**
      * This is our Consensus Algorithm, it resolves conflicts
      * by replacing our chain with the longest one in the network.
+     * Since this version uses async http calls, I return a promise
+     * with this function.
      * 
      * @returns true if our chain was replaced, false if not
      */
