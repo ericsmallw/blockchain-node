@@ -152,12 +152,12 @@ class Blockchain {
                         resolve(false);
                     }
                 },
-                error => {
+                () => {
                     reject(false);
                 }
             );
         });
     }
-};
+}
 
 export default Blockchain;

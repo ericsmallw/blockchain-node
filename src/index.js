@@ -84,4 +84,4 @@ app.get('/nodes/resolve', (req, res) => {
     );
 });
 
-app.listen(port,() => console.log(`Blockchain listening on port ${port}`));
+app.listen(port);
