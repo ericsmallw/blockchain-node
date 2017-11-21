@@ -30,8 +30,30 @@ describe('Blockchain', () => {
         expect(pow.previous_hash).not.toEqual(100);
     });
 
+    it('should have a transaction in newest block sent by 0', () => {
+        const address = v4().replace(/-/g, 'x');
+        blockchain.proof_of_work(address);
+        expect(blockchain.last_block().transactions[0].sender).toBe('0');
+    });
+
     it('should add a new block', () => {
         blockchain.new_block();
         expect(blockchain.chain.length).toEqual(2);
+    });
+
+    it('should return last block', () => {
+        blockchain.new_block();
+        expect(blockchain.last_block()).toBe(blockchain.chain[blockchain.chain.length - 1]);
+    });
+
+    it('should add new transactions to next block', () => {
+        blockchain.new_block();
+        blockchain.new_block();
+        let block_index = blockchain.new_transaction('eric', 'sapphire', 1);
+        block_index = blockchain.new_transaction('eric', 'sapphire', 1);
+        blockchain.proof_of_work('eric')
+
+        expect(block_index).toEqual(4);
+        expect(blockchain.last_block().transactions.length).toEqual(3);
     });
 });
